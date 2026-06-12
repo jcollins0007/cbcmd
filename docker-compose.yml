@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: cbcmd-db
+    environment:
+      POSTGRES_DB: combatcommand
+      POSTGRES_USER: cbcmd_admin
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U cbcmd_admin -d combatcommand"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: cbcmd-api
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: combatcommand
+      DB_USER: cbcmd_admin
+      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+      JWT_SECRET: ${JWT_SECRET:-cbcmd-secret-change-in-production}
+      PORT: 4000
+    volumes:
+      - snapshots:/app/snapshots
+      - uploads:/app/uploads
+
+  frontend:
+    build: ./frontend
+    container_name: cbcmd-web
+    depends_on: [backend]
+    ports:
+      - "${APP_PORT:-9093}:80"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf
+
+volumes:
+  pgdata:
+  snapshots:
+  uploads:
